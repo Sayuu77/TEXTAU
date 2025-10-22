@@ -1,162 +1,247 @@
+# app.py
 import streamlit as st
 import os
 import time
 import glob
-from gtts import gTTS
-from PIL import Image
 import base64
 import io
 import random
+import urllib.request
+from gtts import gTTS
+from PIL import Image
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title="Texto → Audio • Aesthetic", page_icon="🎧", layout="centered")
+st.set_page_config(page_title="Cuentos → Audio • Neo-Glass", page_icon="🌌", layout="centered")
 
-# -------------------- CSS & BACKGROUND --------------------
-# Usa images/clouds.png si existe; si no, cae en un gradiente lila–celeste
-clouds_path = "images/clouds.png"
-bg_css = ""
-if os.path.exists(clouds_path):
-    # usa la imagen clouds como fondo (cover)
-    bg_css = f"""
+# -------------------- STYLE (Neo-Glass) --------------------
+st.markdown("""
     <style>
-      body {{
-        background-image: url('{clouds_path}');
-        background-size: cover;
-        background-attachment: fixed;
-      }}
-      .stApp > .main {{ background-color: rgba(255,255,255,0.6); border-radius: 14px; padding: 18px; }}
+    body {
+      background: linear-gradient(180deg, rgba(20,12,40,0.85), rgba(30,18,60,0.92));
+      color: #E8EAF6;
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    .stApp > .main {
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+      border-radius: 14px;
+      padding: 22px;
+    }
+    .header {
+      display:flex;
+      align-items:center;
+      gap:16px;
+    }
+    .glass-btn {
+      background: linear-gradient(90deg, rgba(120,84,255,0.18), rgba(80,120,255,0.12));
+      color: #F8F9FF;
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    textarea { background: rgba(255,255,255,0.02); color: #F1F1FF; }
+    .small-note { color: #cfcff6; font-size: 13px; }
+    a { color: #C7B3FF; }
     </style>
-    """
-else:
-    bg_css = """
-    <style>
-      body { background: linear-gradient(180deg, #F5E9FF, #E8F8FF); }
-      .stApp > .main { background-color: rgba(255,255,255,0.7); border-radius: 14px; padding: 18px; }
-    </style>
-    """
+""", unsafe_allow_html=True)
 
-st.markdown(bg_css, unsafe_allow_html=True)
-
-# -------------------- HEADER / IMAGEN --------------------
-st.title("🎧 Conversión de Texto a Audio — Soft Aesthetic")
-# mostrar la imagen del gato/ratón si existe
-if os.path.exists("gato_raton.png"):
-    img = Image.open("gato_raton.png")
-    st.image(img, width=320)
-else:
-    st.markdown("*(Coloca `gato_raton.png` en la carpeta del proyecto para ver la imagen)*")
-
-# -------------------- SIDEBAR --------------------
-with st.sidebar:
-    st.header("Instrucciones")
-    st.write("""
-    1. Pega o escribe texto en el área principal.  
-    2. Selecciona idioma.  
-    3. Presiona **Convertir a Audio**.  
-    4. Descarga el MP3 si lo deseas.  
-    """)
-    st.markdown("---")
-    st.write("Si quieres música de fondo coloca `musica.mp3` en la carpeta del proyecto.")
-
-# -------------------- REEMPLAZO: CUENTO JUDE & CARDAN --------------------
-st.subheader("📖 Una historia corta — Jude & Cardan")
-
-cuento_jude_cardan = (
-    "El patio del palacio estaba frío, pero las flores encantadas proyectaban un brillo "
-    "que parecía burlarse de la noche. Jude caminó sin ceremonias, la armadura de quien "
-    "aprendió a no pedir nada. Cardan apareció en el borde de la fuente, con la sonrisa "
-    "que tanto la irritaba y, en ocasiones, la dejaba sin aliento.\n\n"
-    "—Nunca eres sencilla, ¿sabes? —dijo él con voz baja—. Insistes en convertir todo en combate.\n\n"
-    "Jude clavó la mirada. —Y tú insistes en hacer del mundo una broma hilarante. ¿Qué quieres ahora?\n\n"
-    "Cardan se acercó, las manos en los bolsillos, incómodo y exacto a la vez.\n\n"
-    "—Quiero que dejes de mirarme como si fuera un rival. Me cansas, Jude. Me haces sentir demasiado.\n\n"
-    "Ella casi rió. El borde de la risa se vio y lo rechazó por mil motivos prácticos: orgullo, estrategia.\n\n"
-    "—¿Sentir demasiado? Qué original. ¿Vas a llorar ahora, príncipe?\n\n"
-    "Por primera vez en muchas noches, él no devolvió el insulto. En vez de eso, tomó su mano con una "
-    "manera torpe que parecía importarle más que su orgullo.\n\n"
-    "—No sé qué harás conmigo —murmuró—. No sé si serás fuego o refugio. Solo sé que no quiero que te vayas.\n\n"
-    "Jude apretó los dedos, no por debilidad, sino para recordar que aún podía decidir. Sus labios se curvaron "
-    "en algo que no era sonrisa, pero casi.\n\n"
-    "—Entonces no me falles —dijo—. No porque te importe el corazón que tienes, sino porque no lo soportaré si me traicionas.\n\n"
-    "Cardan la miró largo, y el silencio del jardín llenó lo que las palabras no dijeron. Allí, entre orgullo y ternura, "
-    "se quedaron, juntos por una decisión que ninguno nombraría todavía."
-)
-
-st.write(cuento_jude_cardan)
-
-# -------------------- MÚSICA DE FONDO (LOOP) --------------------
-# Si existe musica.mp3, intentamos reproducirla en loop. Nota: algunos navegadores bloquean autoplay.
-if os.path.exists("musica.mp3"):
-    try:
-        with open("musica.mp3", "rb") as mf:
-            music_bytes = mf.read()
-        # mostramos un control para que el usuario lo pause si quiere
-        st.audio(music_bytes, format="audio/mp3", start_time=0)
-        # Intento extra: insertar un elemento <audio> con autoplay & loop (puede ser bloqueado por el navegador)
-        audio_html = """
-        <audio autoplay loop>
-          <source src="musica.mp3" type="audio/mpeg">
-          Your browser does not support the audio element.
-        </audio>
+# -------------------- BACKGROUND IMAGE (optional clouds) --------------------
+# If you want to use an image as a gentle overlay background, you can place it in 'images/clouds.png'
+if os.path.exists("images/clouds.png"):
+    st.markdown(
         """
-        st.markdown(audio_html, unsafe_allow_html=True)
-        st.info("Música de fondo activada (loop). Si no suena automáticamente, presiona el botón de reproducir.")
-    except Exception as e:
-        st.warning("No se pudo cargar musica.mp3 automáticamente. Asegúrate de que el archivo exista y sea MP3.")
-else:
-    st.info("Coloca `musica.mp3` en la carpeta del proyecto para activar la música de fondo en loop.")
+        <style>
+        .stApp {
+            background-image: url('images/clouds.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-blend-mode: overlay;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# -------------------- ÁREA DE TEXTO A CONVERTIR --------------------
+# -------------------- HEADER --------------------
+col1, col2 = st.columns([1,4])
+with col1:
+    if os.path.exists("portada.png"):
+        port = Image.open("portada.png")
+        st.image(port, width=120)
+with col2:
+    st.markdown("<div class='header'><h1 style='margin:0'>🌌 Cuentos & Audio</h1></div>", unsafe_allow_html=True)
+    st.markdown("<div class='small-note'>Neo-Glass • Música en loop • Cuentos públicos</div>", unsafe_allow_html=True)
+
 st.markdown("---")
-st.markdown("### ✏️ Escribe o pega el texto que quieres escuchar")
-text = st.text_area("Texto a convertir", height=180)
 
-option_lang = st.selectbox("Selecciona el idioma", ("Español", "English"))
-lg = 'es' if option_lang == "Español" else 'en'
-
-# -------------------- FUNCIONES TTS Y DESCARGA --------------------
-try:
-    os.makedirs("temp", exist_ok=True)
-except Exception:
-    pass
-
-def text_to_speech(text, lg):
-    if not text or not text.strip():
-        return None, "No hay texto"
+# -------------------- MUSIC AUTOPLAY (muted -> fade-in) --------------------
+# Place 'music.mp3' in the same folder to enable background music.
+if os.path.exists("music.mp3"):
+    # We include an <audio> element muted (browsers allow autoplay if muted), then unmute + fade-in with JS.
+    audio_html = """
+    <audio id="bg_audio" autoplay loop muted>
+      <source src="music.mp3" type="audio/mpeg">
+    </audio>
+    <script>
+      // Fade-in logic: only attempt after small timeout to increase success across browsers.
+      (function() {
+        const a = document.getElementById('bg_audio');
+        if (!a) return;
+        // Try to set volume from 0 to 0.25 over 1.5s
+        a.volume = 0.0;
+        // Some browsers block unmuting programmatically; but many allow unmuting after short delay if played muted first.
+        setTimeout(() => {
+          try {
+            a.muted = false;
+            let vol = 0.0;
+            const target = 0.18;
+            const step = 0.02;
+            const interval = setInterval(() => {
+              vol = Math.min(vol + step, target);
+              a.volume = vol;
+              if (vol >= target) clearInterval(interval);
+            }, 80);
+          } catch (e) {
+            // If unmute is blocked, the user can still press play on the control shown below.
+            console.log('Autoplay unmute blocked or failed', e);
+          }
+        }, 600);
+      })();
+    </script>
+    """
+    # Also show a visible player as fallback so user can manually play if autoplay blocked
+    st.markdown(audio_html, unsafe_allow_html=True)
     try:
-        tts = gTTS(text, lang=lg)
-        safe_name = "".join(c for c in text[:20] if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
-        filename = f"{safe_name or 'audio'}.mp3"
-        path = os.path.join("temp", filename)
-        tts.save(path)
-        return path, text
-    except Exception as e:
-        return None, str(e)
+        with open("music.mp3", "rb") as mf:
+            st.audio(mf.read(), format="audio/mp3", start_time=0)
+    except Exception:
+        st.info("Música encontrada, pero no se pudo cargar el control nativo.")
+else:
+    st.info("Para activar música de fondo: coloca un archivo `music.mp3` en la carpeta del proyecto.")
 
-def get_download_link(file_path, label="Descargar audio"):
-    with open(file_path, "rb") as f:
+st.markdown("---")
+
+# -------------------- PUBLIC-DOMAIN STORY SOURCES (Project Gutenberg) --------------------
+# We'll fetch a short public-domain story at random from this list.
+PUBLIC_STORY_URLS = [
+    # O. Henry - The Gift of the Magi (public domain). Plain text UTF-8 endpoint.
+    "https://www.gutenberg.org/ebooks/7256.txt.utf-8",
+    # Aesop's Fables collection
+    "https://www.gutenberg.org/ebooks/21.txt.utf-8",
+    # Edgar Allan Poe works (contains many short stories; we'll pick an excerpt)
+    "https://www.gutenberg.org/ebooks/2148.txt.utf-8"
+]
+
+st.markdown("## 📚 Cuento aleatorio (dominio público)")
+st.write("Pulsa *Obtener cuento aleatorio* para traer un cuento corto de una fuente pública (Project Gutenberg).")
+
+# Helper: download a story and produce a reasonable excerpt (tries to keep full short stories or short excerpt)
+def fetch_text_from_url(url, max_chars=2200):
+    try:
+        with urllib.request.urlopen(url, timeout=15) as r:
+            raw = r.read().decode('utf-8', errors='ignore')
+        # Heurística: buscar títulos y separar por capítulos o relatos
+        # Si hay '*** START' Gutenberg header, strip header
+        if '*** START' in raw:
+            raw = raw.split('*** START')[1]
+        # Reduce large prefaces and pick a reasonably sized window:
+        clean = raw.strip()
+        if len(clean) <= max_chars:
+            return clean
+        # Try to find two newlines (i.e., paragraph) boundaries for nicer cuts
+        # We'll take the first 2000-2200 chars that end at a paragraph boundary
+        chunk = clean[:max_chars]
+        # expand to next paragraph end if available
+        next_break = clean.find('\n\n', max_chars - 200, max_chars + 400)
+        if next_break != -1 and next_break < max_chars + 600:
+            chunk = clean[:next_break]
+        # Trim leading/trailing whitespace
+        chunk = chunk.strip()
+        return chunk
+    except Exception as e:
+        return f"(Error al obtener el cuento: {e})"
+
+# Button to fetch a random public-domain story
+if st.button("📥 Obtener cuento aleatorio"):
+    url = random.choice(PUBLIC_STORY_URLS)
+    st.info(f"Obteniendo desde: {url}")
+    story_text = fetch_text_from_url(url)
+    st.session_state['last_fetched_story'] = story_text
+    st.session_state['last_fetched_source'] = url
+    st.markdown("### ✨ Cuento obtenido")
+    st.write(story_text)
+
+# If user already fetched before, show it
+if 'last_fetched_story' in st.session_state:
+    st.markdown("### ✨ Último cuento obtenido")
+    st.write(st.session_state['last_fetched_story'])
+    st.markdown(f"*Fuente:* <small>{st.session_state.get('last_fetched_source','')}</small>", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# -------------------- AREA: convertir cuento a audio --------------------
+st.markdown("## 🔊 Convertir cuento (o texto) a audio")
+st.write("Puedes convertir el cuento obtenido arriba ó pegar tu propio texto abajo.")
+
+def ensure_temp():
+    os.makedirs("temp", exist_ok=True)
+
+def text_to_mp3_bytes(text, lang='es'):
+    # returns path to temp file and bytes
+    ensure_temp()
+    safe = "".join(c for c in text[:30] if c.isalnum() or c in (" ", "_")).strip().replace(" ", "_")
+    if not safe:
+        safe = "audio"
+    filename = f"{safe}_{int(time.time())}.mp3"
+    path = os.path.join("temp", filename)
+    # Generate using gTTS
+    tts = gTTS(text, lang=lang)
+    tts.save(path)
+    with open(path, "rb") as f:
         data = f.read()
-    b64 = base64.b64encode(data).decode()
-    href = f'<a href="data:audio/mp3;base64,{b64}" download="{os.path.basename(file_path)}">{label}</a>'
+    return path, data
+
+def download_link_bytes(bytes_data, filename="audio.mp3", label="Descargar audio"):
+    b64 = base64.b64encode(bytes_data).decode()
+    href = f'<a href="data:audio/mp3;base64,{b64}" download="{filename}">{label}</a>'
     return href
 
-# -------------------- BOTÓN CONVERSIÓN --------------------
-if st.button("✨ Convertir a Audio"):
-    if not text.strip():
-        st.warning("Por favor escribe o pega el texto que quieres convertir.")
+# Convert last fetched story
+if st.button("🔁 Convertir cuento obtenido a audio"):
+    if 'last_fetched_story' not in st.session_state:
+        st.warning("Primero obtén un cuento con 'Obtener cuento aleatorio'.")
     else:
-        path, out = text_to_speech(text, lg)
-        if path:
-            st.success("Audio generado ✅")
-            # reproducir en la app
-            with open(path, "rb") as f:
-                st.audio(f.read(), format="audio/mp3")
-            # mostrar enlace de descarga
-            st.markdown(get_download_link(path, label="📥 Descargar audio generado"), unsafe_allow_html=True)
-        else:
-            st.error(f"Error al generar audio: {out}")
+        lang_choice = st.selectbox("Idioma para el audio (cuento)", ("Español", "English"), key="lang_story")
+        lg = 'es' if lang_choice == "Español" else 'en'
+        path, data = text_to_mp3_bytes(st.session_state['last_fetched_story'], lang=lg)
+        st.success("Audio del cuento generado ✅")
+        st.audio(data, format="audio/mp3")
+        st.markdown(download_link_bytes(data, filename=os.path.basename(path), label="📥 Descargar audio del cuento"), unsafe_allow_html=True)
 
-# -------------------- LIMPIEZA DE ARCHIVOS ANTIGUOS --------------------
+st.markdown("---")
+
+# -------------------- AREA: pegar texto propio --------------------
+st.markdown("## ✍️ Pega tu propio texto")
+user_text = st.text_area("Tu texto aquí (o pega un cuento)", height=200)
+lang_choice2 = st.selectbox("Idioma para el audio (texto propio)", ("Español", "English"), key="lang_text")
+if st.button("🔊 Convertir texto a audio"):
+    if not user_text.strip():
+        st.warning("Por favor pega o escribe algún texto.")
+    else:
+        lg2 = 'es' if lang_choice2 == "Español" else 'en'
+        path2, data2 = text_to_mp3_bytes(user_text, lang=lg2)
+        st.success("Audio generado ✅")
+        st.audio(data2, format="audio/mp3")
+        st.markdown(download_link_bytes(data2, filename=os.path.basename(path2), label="📥 Descargar tu audio"), unsafe_allow_html=True)
+
+st.markdown("---")
+
+# -------------------- CLEANUP --------------------
 def cleanup_temp(days=7):
     files = glob.glob("temp/*.mp3")
     now = time.time()
@@ -171,13 +256,5 @@ def cleanup_temp(days=7):
 cleanup_temp(7)
 
 # -------------------- FOOTER --------------------
-st.markdown("---")
-footer_options = [
-    "Un día a la vez 🤍",
-    "No te sueltes.",
-    "También mereces cosas bonitas."
-]
-st.caption(random.choice(footer_options))
-
-# -------------------- RECUERDOS / AYUDA --------------------
-st.info("Si necesitas que te mande un enlace para descargar música libre de derechos (suave, lo-fi / instrumental), dime y te lo comparto.")
+st.caption("Cuentos obtenidos de Project Gutenberg (dominio público). Si usas la app en producción, revisa siempre licencias locales y atribuciones.")
+st.caption("¿Quieres más fuentes públicas o un selector por autor? Dime y lo agrego.")
