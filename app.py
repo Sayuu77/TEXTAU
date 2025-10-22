@@ -10,6 +10,10 @@ import random
 # ========== CONFIGURACIÓN ==========
 st.set_page_config(page_title="Cuentos & Audio", page_icon="📖", layout="centered")
 
+# Para almacenar el cuento actual
+if "cuento_actual" not in st.session_state:
+    st.session_state["cuento_actual"] = ""
+
 # ========== ESTILOS ==========
 st.markdown("""
 <style>
@@ -88,10 +92,38 @@ La hoja decidió soltarse. Y mientras descendía, descubrió que no caía… vol
 
 st.subheader("Generar cuento aleatorio")
 if st.button("Nuevo cuento"):
-    cuento = random.choice(cuentos)
-    st.write(cuento)
+    st.session_state["cuento_actual"] = random.choice(cuentos)
+    st.write(st.session_state["cuento_actual"])
 
-# ========== CONVERTIR TEXTO A AUDIO ==========
+# ========== CONVERTIR CUENTO A AUDIO ==========
+st.subheader("Convertir cuento actual a audio")
+
+def text_to_speech(text, lg):
+    tts = gTTS(text, lang=lg)
+    tts.save("temp/audio.mp3")
+    return "temp/audio.mp3"
+
+idioma_cuento = "es"  # El cuento siempre será en español
+
+if st.button("Convertir cuento en audio"):
+    if st.session_state["cuento_actual"].strip() == "":
+        st.error("Primero genera un cuento antes de convertirlo.")
+    else:
+        try:
+            os.mkdir("temp")
+        except:
+            pass
+
+        audio_path = text_to_speech(st.session_state["cuento_actual"], idioma_cuento)
+        audio_file = open(audio_path, "rb")
+        audio_bytes = audio_file.read()
+        st.audio(audio_bytes, format="audio/mp3")
+
+        b64 = base64.b64encode(audio_bytes).decode()
+        href = f'<a href="data:file/mp3;base64,{b64}" download="cuento.mp3">Descargar audio del cuento</a>'
+        st.markdown(href, unsafe_allow_html=True)
+
+# ========== CONVERTIR TEXTO LIBRE A AUDIO ==========
 st.subheader("Convertir texto a audio")
 
 text = st.text_area("Escribe o pega el texto que deseas convertir a audio:")
@@ -99,18 +131,7 @@ text = st.text_area("Escribe o pega el texto que deseas convertir a audio:")
 idioma = st.selectbox("Selecciona el idioma del audio", ("Español", "English"))
 lg = "es" if idioma == "Español" else "en"
 
-# Carpeta temp
-try:
-    os.mkdir("temp")
-except:
-    pass
-
-def text_to_speech(text, lg):
-    tts = gTTS(text, lang=lg)
-    tts.save("temp/audio.mp3")
-    return "temp/audio.mp3"
-
-if st.button("Convertir a audio"):
+if st.button("Convertir texto a audio"):
     if text.strip() == "":
         st.error("Por favor, escribe un texto antes de convertir.")
     else:
@@ -118,13 +139,11 @@ if st.button("Convertir a audio"):
         audio_file = open(audio_path, "rb")
         audio_bytes = audio_file.read()
         st.audio(audio_bytes, format="audio/mp3")
-
-        # Descargar
         b64 = base64.b64encode(audio_bytes).decode()
         href = f'<a href="data:file/mp3;base64,{b64}" download="audio.mp3">Descargar audio</a>'
         st.markdown(href, unsafe_allow_html=True)
 
-# Limpiar audios antiguos
+# ========= LIMPIEZA ==========
 def remove_files(n):
     mp3_files = glob.glob("temp/*mp3")
     now = time.time()
