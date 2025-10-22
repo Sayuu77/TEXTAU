@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import os
 import time
@@ -7,128 +6,111 @@ import base64
 import io
 import random
 from gtts import gTTS
+from PIL import Image
+import requests
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_icon="🌌", layout="centered")
+st.set_page_config(page_title="Cuentos → Audio • Lofi Dreamy", page_icon="🌙", layout="centered")
 
-# -------------------- ESTILO NEO-GLASS --------------------
+# -------------------- ESTILO Lofi Dreamy (neo-glass) --------------------
 st.markdown("""
     <style>
+    :root{
+      --accent1: #9B84FF; /* lila */
+      --accent2: #90E0FF; /* celeste */
+      --glass-bg: rgba(255,255,255,0.04);
+      --text-soft: #F3F2FF;
+    }
     body {
-      background: linear-gradient(180deg, rgba(8,6,23,0.94), rgba(18,10,40,0.96));
-      color: #EAEAF6;
-      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #0B0820 0%, #1B1130 50%, #0F1724 100%);
+      color: var(--text-soft);
+      font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
     }
     .stApp > .main {
-      background: rgba(255,255,255,0.03);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.04);
-      box-shadow: 0 10px 30px rgba(1,4,20,0.6);
-      border-radius: 14px;
-      padding: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.03);
+      box-shadow: 0 8px 30px rgba(2,6,23,0.7);
+      border-radius: 16px;
+      padding: 26px;
     }
-    .header { display:flex; align-items:center; gap:16px; }
-    .glass-btn {
-      background: linear-gradient(90deg, rgba(140,100,255,0.14), rgba(90,130,255,0.10));
-      color: #F6F7FF;
-      border: 1px solid rgba(255,255,255,0.06);
-      padding: 8px 14px;
-      border-radius: 10px;
-      cursor: pointer;
+    /* Hero banner */
+    .hero-title {
+      font-size: 34px;
+      font-weight: 700;
+      margin: 8px 0 2px 0;
+      color: white;
+      letter-spacing: 0.2px;
+    }
+    .hero-sub {
+      color: #DAD6FF;
+      margin: 0 0 12px 0;
+    }
+
+    /* Buttons */
+    .stButton>button, .glass-btn {
+      background: linear-gradient(90deg, var(--accent2), var(--accent1));
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 12px;
       font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(139,115,255,0.12);
     }
-    textarea { background: rgba(255,255,255,0.02); color: #F1F1FF; }
-    .small-note { color: #cfcff6; font-size: 13px; }
-    a { color: #C7B3FF; }
-    .muted { color: #bfbfe6 }
+    .stButton>button:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
+
+    /* Cards / textareas */
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.03);
+      padding: 14px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+    }
+    textarea { background: rgba(255,255,255,0.02); color: #F6F6FF; }
+    .small-note { color: #CFCFF6; font-size: 13px; margin-top:6px; }
+    .muted { color: #BDB9E8; font-size:13px; }
     </style>
 """, unsafe_allow_html=True)
 
-# -------------------- BACKGROUND OVERLAY (opcional clouds) --------------------
-if os.path.exists("images/clouds.png"):
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-image: url('images/clouds.png');
-            background-size: cover;
-            background-attachment: fixed;
-            background-blend-mode: overlay;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+# -------------------- HERO BANNER (portada grande) --------------------
+# If portada.png exists in folder, use it. Otherwise use an online fallback image.
+hero_image_path = "portada.png"
+fallback_url = "https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1350&q=80"
 
-# -------------------- HEADER --------------------
-col1, col2 = st.columns([1,4])
-with col1:
-    if os.path.exists("portada.png"):
-        try:
-            from PIL import Image
-            port = Image.open("portada.png")
-            st.image(port, width=110)
-        except Exception:
-            pass
-with col2:
-    st.markdown("<div class='header'><h1 style='margin:0'>🌌 Cuentos & Audio</h1></div>", unsafe_allow_html=True)
-    st.markdown("<div class='small-note'>Neo-Glass • Lo-fi lluvia (autoplay) • Cuentos en español</div>", unsafe_allow_html=True)
-
-st.markdown("---")
-
-# -------------------- MÚSICA AUTOPLAY (LO-FI LLUVIA) --------------------
-# Coloca 'music.mp3' en la carpeta para activar sonido. Técnica: audio autoplay muted -> script intenta unmute + fade-in.
-if os.path.exists("music.mp3"):
-    audio_html = """
-    <audio id="bg_audio" autoplay loop muted>
-      <source src="music.mp3" type="audio/mpeg">
-      Your browser does not support the audio element.
-    </audio>
-    <script>
-      (function() {
-        const a = document.getElementById('bg_audio');
-        if (!a) return;
-        a.volume = 0.0;
-        // small timeout to help browsers accept autoplay if initially muted
-        setTimeout(() => {
-          try {
-            a.muted = false;
-            let vol = 0.0;
-            const target = 0.15; // volumen objetivo suave
-            const step = 0.01;
-            const interval = setInterval(() => {
-              vol = Math.min(vol + step, target);
-              a.volume = vol;
-              if (vol >= target) clearInterval(interval);
-            }, 80);
-          } catch (e) {
-            console.log('Autoplay unmute blocked', e);
-          }
-        }, 500);
-      })();
-    </script>
-    """
-    st.markdown(audio_html, unsafe_allow_html=True)
-    # fallback visible control
+st.markdown("<div style='display:flex; gap:18px; align-items:center'>", unsafe_allow_html=True)
+if os.path.exists(hero_image_path):
     try:
-        with open("music.mp3", "rb") as mf:
-            st.audio(mf.read(), format="audio/mp3", start_time=0)
+        img = Image.open(hero_image_path)
+        st.image(img, use_column_width=True)
     except Exception:
-        st.info("Música detectada pero no se pudo cargar el control nativo.")
+        # if failed to load local, try remote
+        st.image(fallback_url, use_column_width=True)
 else:
-    st.info("Para tener música de fondo automática, coloca 'music.mp3' (lo-fi lluvia) en la carpeta del proyecto.")
+    # load remote hero image
+    st.image(fallback_url, use_column_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<div style='text-align:center'>", unsafe_allow_html=True)
+st.markdown("<div class='hero-title'>🌙 Cuentos & Audio — Lofi Dreamy</div>", unsafe_allow_html=True)
+st.markdown("<div class='hero-sub'>Historias en español — inmersivas, sutiles y en tono de realismo mágico</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# -------------------- CUENTOS EN ESPAÑOL (LOCALES / FÁCILES) --------------------
-# Usamos por defecto cuentos originales en español (limpios) para garantizar que siempre sean adecuados.
-ORIGINAL_SPANISH_STORIES = [
-    "La luna rompió el silencio del pueblo. Marta encontró una carta bajo la puerta que no esperaba. En ella había una sola frase: 'Vuelve cuando te falte el corazón'. Fue suficiente para que entendiera que algunas ausencias no eran olvido, sino invitación.",
-    "En la estación, el tren llegó tarde. Un niño soltó su cometa y la rueda de la fortuna del parque se quedó pensando. Ella lo ayudó a recuperar el hilo; aprendió que a veces las manos extrañas empiezan amistades inesperadas.",
-    "El faro seguía encendido por costumbre. Álvaro subió sus escaleras y, desde la cima, decidió escribir la primera carta a quien aún no conocía. Así prometió cuidar lo que estaba por venir sin prisa.",
-    "Un anciano vendía historias en el mercado; no las cobraba, las prestaba. Quien se sentaba a escuchar, salía con la sensación de que el mundo era más grande y menos urgente.",
-    "En un jardín secreto, las palabras crecían como flores. Sofía aprendió a regarlas con silencio y, al final, fue capaz de decir solo lo que realmente importaba."
+# -------------------- CUENTOS (medianos, realismo mágico + fantasía suave) --------------------
+STORIES = [
+    """La noche había teñido la laguna de un azul que parecía guardar secretos. Marta llegó con una carta sin remitente y la dejó sobre la piedra más alta. Al abrirla descubrió una palabra: regreso. La palabra no era una instrucción; era una puerta. Cuando la pronunció, las linternas del pueblo encendieron una fila de luces en el agua y un barquero de sombra la condujo hacia una isla que no aparecía en los mapas. Allí encontró objetos con nombres olvidados: una taza que susurraba palabras de infancia, un reloj que corría hacia atrás para recuperar instantes. Marta comprendió que el lugar no borraba el pasado, lo ponía en orden como quien acomoda los libros de una biblioteca para que vuelvan a leerse con ternura.""",
+    """En la plaza central, los relojes marcaban horas distintas según el lado por donde uno entrara. Bruno, aburrido de la rutina, decidió cruzar la plaza cada día por una puerta diferente. Un martes halló una puerta pequeña y circular, apenas perceptible, que lo condujo a una estación donde el tren esperaba silencioso. Solo subían viajeros que buscaban un recuerdo específico: la sonrisa de una madre, la voz de un abuelo, el sabor de una merienda. Bruno pidió su recuerdo y, al mirarlo, descubrió que aquello que había perdido no era solo una cosa, sino la manera en que lo miraba. Al bajar del tren, volvió al pueblo un poco más paciente con su propia memoria.""",
+    """Una librería se escondía entre fachadas iguales; su dueño, sin edad, iba colocando palabras que nadie pedía. Marta entró una tarde de lluvia porque su paraguas le pidió refugio. Allí encontró una novela que describía exactamente la escena que vivía en ese instante: la humedad en el cristal, la mirada de un hombre leyendo al fondo, su propia duda. La novela no era espejo, era promesa: quien la leyera con atención hallaría una página extra, un relato pequeño que hablaba de decisiones aún no tomadas. Marta escribió su nombre en esa página y la tinta, por un instante, se transformó en una escalera hacia una ventana que ella no sabía que necesitaba abrir.""",
+    """Un faro que ya no guiaba barcos seguía encendido por costumbre. Cada noche, su luz dibujaba un camino que nadie seguía hasta que Lucas, cansado de ciudades sin memoria, subió los peldaños. En la cima halló cartas atadas con cordeles: palabras dirigidas a futuros lectores que aún no existían. Tomó una, la leyó y sintió que leían en voz baja aquello que su propia vida callaba. Escribió otra, puso su firma y la ató. Tiempo después recibió una carta desde un lugar que no conocía: quien la firmaba decía haber recibido la suya y agradecía por haber escrito algo que lo había salvado de una noche sin estrellas.""",
+    """En un barrio donde las casas cambiaban de paredes cada primavera, Lucía encontró una puerta que crujía en otra lengua. Tras atravesarla apareció un jardín donde crecían frases como flores: poemas, silencios, promesas. Para regarlas no usaba agua sino recuerdos. Lucía dejó caer en la tierra una memoria de su infancia, una tarde de juegos y risas olvidadas, y al crecer la planta le entregó un recuerdo que nunca supo que necesitaba: la certeza de que algunas pérdidas se convierten en compañía si se les permite echar raíces.""",
+    """Había un café en la esquina donde los clientes solo pedían cosas pequeñas: un gesto, una disculpa, una canción. El dueño no cobraba sino que guardaba las palabras en frascos. Una tarde entró Elena y señaló un frasco sin etiqueta. Al abrirlo, una melodía salió y llenó el lugar de nombres propios. Elena entendió que el frasco guardaba lo que uno había sido y decidió llevarse un poco. Desde entonces volvió a hablar con quienes evitaba y notó que el mundo tenía más huecos para llenar que para temer."""
 ]
 
 # -------------------- UTILIDADES TTS --------------------
@@ -142,7 +124,8 @@ def text_to_mp3_bytes(text, lang='es'):
         safe = "audio"
     filename = f"{safe}_{int(time.time())}.mp3"
     path = os.path.join("temp", filename)
-    # Generar audio (gTTS — necesita conexión)
+    # gTTS puede fallar si el texto es muy largo; dividimos si es necesario en chunks razonables
+    # Para la mayoría de historias medianas esto funciona directo.
     tts = gTTS(text, lang=lang)
     tts.save(path)
     with open(path, "rb") as f:
@@ -154,48 +137,48 @@ def download_link_bytes(bytes_data, filename="audio.mp3", label="📥 Descargar 
     href = f'<a href="data:audio/mp3;base64,{b64}" download="{filename}">{label}</a>'
     return href
 
-# -------------------- INTERFAZ: OBTENER CUENTO --------------------
-st.markdown("## 📚 Obtener cuento aleatorio (ES)")
-st.write("Pulsa **Obtener cuento aleatorio** para mostrar una historia breve y directa (solo la historia).")
+# -------------------- UI: Obtener cuento --------------------
+st.markdown("## 📚 Cuento aleatorio")
+st.write("Pulsa **Obtener cuento** y aparecerá una historia completa (mediana, lista para leer).")
 
-if st.button("📥 Obtener cuento aleatorio"):
-    story = random.choice(ORIGINAL_SPANISH_STORIES)
-    # Guardamos temporalmente en session_state para permitir convertirlo sin mostrar 'último cuento'
+if st.button("📥 Obtener cuento"):
+    story = random.choice(STORIES)
     st.session_state['current_story'] = story
-    # Mostramos solo la historia generada
-    st.markdown("### ✨ Cuento")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("### ✨ Tu cuento")
     st.write(story)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# -------------------- CONVERTIR EL CUENTO ACTUAL --------------------
-st.markdown("## 🔊 Convertir el cuento actual a audio")
-st.write("Si acabas de obtener un cuento, puedes convertirlo a audio en español (o en inglés si lo deseas).")
+# -------------------- CONVERTIR EL CUENTO A AUDIO --------------------
+st.markdown("## 🔊 Convertir el cuento a audio")
+st.write("Convierte el cuento obtenido o conviértelo en otro idioma con la opción de idioma.")
 
-if st.button("🔁 Convertir cuento actual a audio"):
+if st.button("🔁 Convertir cuento a audio"):
     if 'current_story' not in st.session_state:
-        st.warning("Primero pulsa 'Obtener cuento aleatorio'.")
+        st.warning("Primero pulsa 'Obtener cuento'.")
     else:
         try:
-            # permitimos elegir idioma para la conversión (solo afecta al TTS)
+            # elegir idioma solo para TTS (interface sigue en español)
             lang_choice = st.selectbox("Idioma para el audio del cuento:", ("Español", "English"), key="lang_story_convert")
             lg = 'es' if lang_choice == "Español" else 'en'
             path, data = text_to_mp3_bytes(st.session_state['current_story'], lang=lg)
             st.success("Audio del cuento generado ✅")
             st.audio(data, format="audio/mp3")
             st.markdown(download_link_bytes(data, filename=os.path.basename(path), label="📥 Descargar audio del cuento"), unsafe_allow_html=True)
-            # una vez convertido, podemos eliminar la clave para evitar "último cuento"
+            # borrar el cuento actual para no recordarlo después
             del st.session_state['current_story']
         except Exception as e:
             st.error(f"Error al generar audio: {e}")
 
 st.markdown("---")
 
-# -------------------- AREA: PEGAR TEXTO PROPIO --------------------
-st.markdown("## ✍️ Pega tu propio texto (español)")
+# -------------------- CONVERTIR TEXTO PROPIO --------------------
+st.markdown("## ✍️ Pega tu propio texto (en español)")
 user_text = st.text_area("Pega tu texto o cuento aquí:", height=220)
 lang_choice2 = st.selectbox("Idioma para el audio (tu texto):", ("Español", "English"), key="lang_text_convert")
-if st.button("🔊 Convertir texto a audio"):
+if st.button("🔊 Convertir tu texto a audio"):
     if not user_text.strip():
         st.warning("Por favor pega o escribe algún texto.")
     else:
@@ -210,7 +193,7 @@ if st.button("🔊 Convertir texto a audio"):
 
 st.markdown("---")
 
-# -------------------- LIMPIEZA AUTOMÁTICA --------------------
+# -------------------- LIMPIEZA TEMP --------------------
 def cleanup_temp(days=7):
     files = glob.glob("temp/*.mp3")
     now = time.time()
@@ -223,6 +206,3 @@ def cleanup_temp(days=7):
             pass
 
 cleanup_temp(7)
-
-# -------------------- FOOTER --------------------
-st.caption("Historias en español — limpias y directas. gTTS requiere conexión a internet para generar audio.")
