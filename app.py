@@ -254,7 +254,3 @@ def cleanup_temp(days=7):
             pass
 
 cleanup_temp(7)
-
-# -------------------- FOOTER --------------------
-st.caption("Cuentos obtenidos de Project Gutenberg (dominio público). Si usas la app en producción, revisa siempre licencias locales y atribuciones.")
-st.caption("¿Quieres más fuentes públicas o un selector por autor? Dime y lo agrego.")
