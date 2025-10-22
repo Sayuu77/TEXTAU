@@ -10,10 +10,6 @@ import random
 # ========== CONFIGURACIÓN ==========
 st.set_page_config(page_title="Cuentos & Audio", page_icon="📖", layout="centered")
 
-# Para almacenar el cuento actual
-if "cuento_actual" not in st.session_state:
-    st.session_state["cuento_actual"] = ""
-
 # ========== ESTILOS ==========
 st.markdown("""
 <style>
@@ -66,6 +62,10 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 st.title("Cuentos & Conversión a Audio")
 
+# ========== SESIÓN ==========
+if "cuento_actual" not in st.session_state:
+    st.session_state["cuento_actual"] = ""
+
 # ========== CUENTOS ==========
 cuentos = [
     """La niña del faro
@@ -79,8 +79,7 @@ Una noche silenciosa, con el mar en calma, una campana sonó a lo lejos. Ela cor
 
 —Te lo prometí —susurró.
 
-Nunca dejó de creer."""
-,
+Nunca dejó de creer.""",
     """La hoja que no quería caer
 
 Había una hoja pequeña en un gran roble. Todas sus hermanas caían con el viento del otoño, pero ella tenía miedo. «¿Y si caer duele?» se preguntaba.
@@ -91,39 +90,16 @@ La hoja decidió soltarse. Y mientras descendía, descubrió que no caía… vol
 ]
 
 st.subheader("Generar cuento aleatorio")
+
+# Botón para generar cuento
 if st.button("Nuevo cuento"):
     st.session_state["cuento_actual"] = random.choice(cuentos)
+
+# Mostrar el cuento si existe
+if st.session_state["cuento_actual"] != "":
     st.write(st.session_state["cuento_actual"])
 
-# ========== CONVERTIR CUENTO A AUDIO ==========
-st.subheader("Convertir cuento actual a audio")
-
-def text_to_speech(text, lg):
-    tts = gTTS(text, lang=lg)
-    tts.save("temp/audio.mp3")
-    return "temp/audio.mp3"
-
-idioma_cuento = "es"  # El cuento siempre será en español
-
-if st.button("Convertir cuento en audio"):
-    if st.session_state["cuento_actual"].strip() == "":
-        st.error("Primero genera un cuento antes de convertirlo.")
-    else:
-        try:
-            os.mkdir("temp")
-        except:
-            pass
-
-        audio_path = text_to_speech(st.session_state["cuento_actual"], idioma_cuento)
-        audio_file = open(audio_path, "rb")
-        audio_bytes = audio_file.read()
-        st.audio(audio_bytes, format="audio/mp3")
-
-        b64 = base64.b64encode(audio_bytes).decode()
-        href = f'<a href="data:file/mp3;base64,{b64}" download="cuento.mp3">Descargar audio del cuento</a>'
-        st.markdown(href, unsafe_allow_html=True)
-
-# ========== CONVERTIR TEXTO LIBRE A AUDIO ==========
+# ========== CONVERTIR TEXTO A AUDIO ==========
 st.subheader("Convertir texto a audio")
 
 text = st.text_area("Escribe o pega el texto que deseas convertir a audio:")
@@ -131,19 +107,45 @@ text = st.text_area("Escribe o pega el texto que deseas convertir a audio:")
 idioma = st.selectbox("Selecciona el idioma del audio", ("Español", "English"))
 lg = "es" if idioma == "Español" else "en"
 
-if st.button("Convertir texto a audio"):
+# Carpeta temp
+try:
+    os.mkdir("temp")
+except:
+    pass
+
+def text_to_speech(text, lg):
+    tts = gTTS(text, lang=lg)
+    tts.save("temp/audio.mp3")
+    return "temp/audio.mp3"
+
+if st.button("Convertir a audio"):
+    # Si no hay texto del usuario, intenta convertir el cuento actual
     if text.strip() == "":
-        st.error("Por favor, escribe un texto antes de convertir.")
+        if st.session_state["cuento_actual"] == "":
+            st.error("No hay texto ni cuento para convertir.")
+        else:
+            audio_path = text_to_speech(st.session_state["cuento_actual"], lg)
+            audio_file = open(audio_path, "rb")
+            audio_bytes = audio_file.read()
+            st.audio(audio_bytes, format="audio/mp3")
+
+            # Descargar
+            b64 = base64.b64encode(audio_bytes).decode()
+            href = f'<a href="data:file/mp3;base64,{b64}" download="audio.mp3">Descargar audio</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
     else:
         audio_path = text_to_speech(text, lg)
         audio_file = open(audio_path, "rb")
         audio_bytes = audio_file.read()
         st.audio(audio_bytes, format="audio/mp3")
+
+        # Descargar
         b64 = base64.b64encode(audio_bytes).decode()
         href = f'<a href="data:file/mp3;base64,{b64}" download="audio.mp3">Descargar audio</a>'
         st.markdown(href, unsafe_allow_html=True)
 
-# ========= LIMPIEZA ==========
+# ========== LIMPIEZA DE AUDIOS ANTIGUOS ==========
 def remove_files(n):
     mp3_files = glob.glob("temp/*mp3")
     now = time.time()
