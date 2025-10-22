@@ -90,7 +90,7 @@ if os.path.exists(hero_image_path):
         st.image(img, use_column_width=True)
     except Exception:
         # if failed to load local, try remote
-        st.image(fallback_url, use_column_width=True)
+        st.image(fallback_url, use_container_width=True)
 else:
     # load remote hero image
     st.image(fallback_url, use_column_width=True)
