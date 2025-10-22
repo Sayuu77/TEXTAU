@@ -11,7 +11,7 @@ from gtts import gTTS
 from PIL import Image
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title="Cuentos → Audio • Neo-Glass (ES)", page_icon="🌌", layout="centered")
+st.set_page_config(page_title=, page_icon="🌌", layout="centered")
 
 # -------------------- STYLE (Neo-Glass nocturno) --------------------
 st.markdown("""
