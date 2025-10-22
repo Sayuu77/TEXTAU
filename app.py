@@ -6,14 +6,12 @@ import glob
 import base64
 import io
 import random
-import urllib.request
 from gtts import gTTS
-from PIL import Image
 
 # -------------------- CONFIG --------------------
-st.set_page_config(page_title=, page_icon="🌌", layout="centered")
+st.set_page_config(page_icon="🌌", layout="centered")
 
-# -------------------- STYLE (Neo-Glass nocturno) --------------------
+# -------------------- ESTILO NEO-GLASS --------------------
 st.markdown("""
     <style>
     body {
@@ -28,7 +26,7 @@ st.markdown("""
       border: 1px solid rgba(255,255,255,0.04);
       box-shadow: 0 10px 30px rgba(1,4,20,0.6);
       border-radius: 14px;
-      padding: 24px;
+      padding: 22px;
     }
     .header { display:flex; align-items:center; gap:16px; }
     .glass-btn {
@@ -47,7 +45,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# -------------------- BACKGROUND OVERLAY (optional clouds) --------------------
+# -------------------- BACKGROUND OVERLAY (opcional clouds) --------------------
 if os.path.exists("images/clouds.png"):
     st.markdown(
         """
@@ -68,156 +66,72 @@ col1, col2 = st.columns([1,4])
 with col1:
     if os.path.exists("portada.png"):
         try:
+            from PIL import Image
             port = Image.open("portada.png")
             st.image(port, width=110)
         except Exception:
             pass
 with col2:
-    st.markdown("<div class='header'><h1 style='margin:0'>🌌 Cuentos & Audio (ES)</h1></div>", unsafe_allow_html=True)
-    st.markdown("<div class='small-note'>Neo-Glass • Música en loop • Cuentos en español</div>", unsafe_allow_html=True)
+    st.markdown("<div class='header'><h1 style='margin:0'>🌌 Cuentos & Audio</h1></div>", unsafe_allow_html=True)
+    st.markdown("<div class='small-note'>Neo-Glass • Lo-fi lluvia (autoplay) • Cuentos en español</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# -------------------- MÚSICA AUTOPLAY (muted -> fade-in) --------------------
-# Coloca 'music.mp3' en la carpeta del proyecto para activar música.
+# -------------------- MÚSICA AUTOPLAY (LO-FI LLUVIA) --------------------
+# Coloca 'music.mp3' en la carpeta para activar sonido. Técnica: audio autoplay muted -> script intenta unmute + fade-in.
 if os.path.exists("music.mp3"):
     audio_html = """
     <audio id="bg_audio" autoplay loop muted>
       <source src="music.mp3" type="audio/mpeg">
+      Your browser does not support the audio element.
     </audio>
     <script>
       (function() {
         const a = document.getElementById('bg_audio');
         if (!a) return;
         a.volume = 0.0;
+        // small timeout to help browsers accept autoplay if initially muted
         setTimeout(() => {
           try {
             a.muted = false;
             let vol = 0.0;
-            const target = 0.14;
-            const step = 0.02;
+            const target = 0.15; // volumen objetivo suave
+            const step = 0.01;
             const interval = setInterval(() => {
               vol = Math.min(vol + step, target);
               a.volume = vol;
               if (vol >= target) clearInterval(interval);
-            }, 100);
+            }, 80);
           } catch (e) {
             console.log('Autoplay unmute blocked', e);
           }
-        }, 600);
+        }, 500);
       })();
     </script>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
+    # fallback visible control
     try:
         with open("music.mp3", "rb") as mf:
             st.audio(mf.read(), format="audio/mp3", start_time=0)
     except Exception:
-        st.info("Música encontrada, pero no se pudo cargar el control nativo.")
+        st.info("Música detectada pero no se pudo cargar el control nativo.")
 else:
-    st.info("Para activar música de fondo automática: coloca un archivo `music.mp3` en la carpeta del proyecto.")
+    st.info("Para tener música de fondo automática, coloca 'music.mp3' (lo-fi lluvia) en la carpeta del proyecto.")
 
 st.markdown("---")
 
-# -------------------- FUENTES PÚBLICAS EN ESPAÑOL (ejemplos) --------------------
-# Intentamos obtener cuentos en español desde fuentes públicas en español.
-# Si la descarga falla, usamos cuentos originales en español (limpios y cortos).
-# Las URLs pueden ser actualizadas por ti; muchas bibliotecas digitales tienen textos de dominio público.
-SPANISH_STORY_URLS = [
-    # Ejemplos de textos en español en dominio público (puedes añadir más URLs válidas).
-    # NOTA: Algunas URLs pueden requerir adaptación o fallar según respuesta del servidor.
-    "https://www.gutenberg.org/cache/epub/2000/pg2000.txt",  # ejemplo (puede ser en inglés) - se intentará limpiar y si no está en español usamos fallback
-    # Puedes agregar otras fuentes públicas en español aquí.
-]
-
-# -------------------- HISTORIAS ORIGINALES (fallback / preferidas) --------------------
-# Lista de cuentos breves originales en español (limpios, directos)
+# -------------------- CUENTOS EN ESPAÑOL (LOCALES / FÁCILES) --------------------
+# Usamos por defecto cuentos originales en español (limpios) para garantizar que siempre sean adecuados.
 ORIGINAL_SPANISH_STORIES = [
-    # 1
-    "La luna rompió el silencio de la plaza. Ana caminó sin prisa, sosteniendo un pequeño papel con una dirección que ya no recordaba. Al llegar, encontró la casa con las luces aún encendidas. Allí, una voz antigua la reconoció por su risa. Fue suficiente para que entendiera: a veces, volver no borra lo pasado, lo transforma en compañía.",
-    # 2
-    "El río guardaba secretos; Pedro se sentó a la orilla y dejó que el agua le devolviera recuerdos ligeros. Sonrió al pensar que no todo lo que perdemos se va: algunas cosas solo cambian de bolsillo y vuelven como historias.",
-    # 3
-    "En un pueblo donde todas las puertas eran iguales, Clara encontró una con una marca diminuta. Al cruzarla, descubrió un jardín donde las palabras brotaban en flores. Aprendió a cultivar silencios y a hablar solo cuando la tierra estaba lista.",
-    # 4
-    "El faro ya no alumbraba barcos, pero seguía encendido por costumbre. Martín subió sus escaleras y, desde arriba, prometió escribir una carta a su propio futuro: la única persona que debía leerla era la que aún no existía.",
-    # 5
-    "Una niña vendía luciérnagas en frascos. No por maldad, sino por memoria: quería que la noche guardara pequeñas luces que nadie pudiera apagar. Quien compró un frasco, volvió a creer en rutas inesperadas."
+    "La luna rompió el silencio del pueblo. Marta encontró una carta bajo la puerta que no esperaba. En ella había una sola frase: 'Vuelve cuando te falte el corazón'. Fue suficiente para que entendiera que algunas ausencias no eran olvido, sino invitación.",
+    "En la estación, el tren llegó tarde. Un niño soltó su cometa y la rueda de la fortuna del parque se quedó pensando. Ella lo ayudó a recuperar el hilo; aprendió que a veces las manos extrañas empiezan amistades inesperadas.",
+    "El faro seguía encendido por costumbre. Álvaro subió sus escaleras y, desde la cima, decidió escribir la primera carta a quien aún no conocía. Así prometió cuidar lo que estaba por venir sin prisa.",
+    "Un anciano vendía historias en el mercado; no las cobraba, las prestaba. Quien se sentaba a escuchar, salía con la sensación de que el mundo era más grande y menos urgente.",
+    "En un jardín secreto, las palabras crecían como flores. Sofía aprendió a regarlas con silencio y, al final, fue capaz de decir solo lo que realmente importaba."
 ]
 
-# -------------------- UTIL: LIMPIAR TEXTO OBTENIDO --------------------
-def clean_fetched_text(raw):
-    """
-    Intenta eliminar cabeceras, pies y metadatos comunes (Gutenberg y similares),
-    y devuelve un bloque de texto en español (o cercano) sin prólogos/índices.
-    """
-    try:
-        # Quitar headers tipo Gutenberg
-        if '*** START' in raw:
-            raw = raw.split('*** START', 1)[-1]
-        if '*** END' in raw:
-            raw = raw.split('*** END', 1)[0]
-        # Quitar secuencias largas de mayúsculas (índices) iniciales
-        # Tomar una ventana inicial razonable y buscar primer párrafo largo
-        raw = raw.strip()
-        # Reemplazar múltiples saltos de línea por doble salto
-        raw = "\n\n".join([p.strip() for p in raw.splitlines() if p.strip() != ""])
-        # Buscar segmentos en español (heurística: presencia de artículos en español)
-        spanish_indicators = [' la ', ' el ', ' que ', ' de ', ' y ', ' los ', ' las ', ' un ', ' una ']
-        # Si no parece español, devolvemos None para fallback
-        lowered = raw.lower()
-        if not any(ind in lowered for ind in spanish_indicators):
-            return None
-        # Tomar hasta 2000 caracteres terminando en final de párrafo
-        max_chars = 2000
-        if len(raw) <= max_chars:
-            return raw
-        # intentar cortar en un parrafo entero
-        cut = raw[:max_chars]
-        # expandir hasta el siguiente doble salto de linea
-        next_break = raw.find('\n\n', max_chars - 200, max_chars + 500)
-        if next_break != -1 and next_break < max_chars + 600:
-            cut = raw[:next_break]
-        return cut.strip()
-    except Exception:
-        return None
-
-# -------------------- OBTENER CUENTO ALEATORIO (intento internet -> fallback original) --------------------
-def fetch_random_spanish_story():
-    # Intentar cada URL hasta que alguna devuelva texto en español
-    random.shuffle(SPANISH_STORY_URLS)
-    for url in SPANISH_STORY_URLS:
-        try:
-            with urllib.request.urlopen(url, timeout=12) as r:
-                raw = r.read().decode('utf-8', errors='ignore')
-            cleaned = clean_fetched_text(raw)
-            if cleaned:
-                return cleaned, url
-        except Exception:
-            continue
-    # Si no se obtuvo nada, devolvemos un cuento original aleatorio
-    return random.choice(ORIGINAL_SPANISH_STORIES), "interno:historia_original"
-
-# -------------------- UI: Cuento aleatorio --------------------
-st.markdown("## 📚 Cuento aleatorio en español")
-st.write("Pulsa **Obtener cuento aleatorio** para traer una historia breve y directa (sin prólogos ni índices).")
-
-if st.button("📥 Obtener cuento aleatorio (ES)"):
-    story_text, source = fetch_random_spanish_story()
-    st.session_state['last_story'] = story_text
-    st.session_state['last_story_source'] = source
-    st.markdown("### ✨ Cuento obtenido")
-    st.write(story_text)
-
-# Mostrar último cuento si existe
-if 'last_story' in st.session_state:
-    st.markdown("### ✨ Último cuento obtenido")
-    st.write(st.session_state['last_story'])
-    st.markdown(f"*Fuente:* <span class='muted'>{st.session_state.get('last_story_source','')}</span>", unsafe_allow_html=True)
-
-st.markdown("---")
-
-# -------------------- TTS / CONVERSIÓN --------------------
+# -------------------- UTILIDADES TTS --------------------
 def ensure_temp():
     os.makedirs("temp", exist_ok=True)
 
@@ -228,7 +142,7 @@ def text_to_mp3_bytes(text, lang='es'):
         safe = "audio"
     filename = f"{safe}_{int(time.time())}.mp3"
     path = os.path.join("temp", filename)
-    # Generar con gTTS
+    # Generar audio (gTTS — necesita conexión)
     tts = gTTS(text, lang=lang)
     tts.save(path)
     with open(path, "rb") as f:
@@ -240,34 +154,53 @@ def download_link_bytes(bytes_data, filename="audio.mp3", label="📥 Descargar 
     href = f'<a href="data:audio/mp3;base64,{b64}" download="{filename}">{label}</a>'
     return href
 
-# -------------------- Convertir cuento obtenido --------------------
-st.markdown("## 🔊 Convertir cuento obtenido a audio")
-st.write("Si ya obtuviste un cuento arriba, puedes convertirlo a audio en español.")
+# -------------------- INTERFAZ: OBTENER CUENTO --------------------
+st.markdown("## 📚 Obtener cuento aleatorio (ES)")
+st.write("Pulsa **Obtener cuento aleatorio** para mostrar una historia breve y directa (solo la historia).")
 
-if st.button("🔁 Convertir cuento obtenido a audio"):
-    if 'last_story' not in st.session_state:
+if st.button("📥 Obtener cuento aleatorio"):
+    story = random.choice(ORIGINAL_SPANISH_STORIES)
+    # Guardamos temporalmente en session_state para permitir convertirlo sin mostrar 'último cuento'
+    st.session_state['current_story'] = story
+    # Mostramos solo la historia generada
+    st.markdown("### ✨ Cuento")
+    st.write(story)
+
+st.markdown("---")
+
+# -------------------- CONVERTIR EL CUENTO ACTUAL --------------------
+st.markdown("## 🔊 Convertir el cuento actual a audio")
+st.write("Si acabas de obtener un cuento, puedes convertirlo a audio en español (o en inglés si lo deseas).")
+
+if st.button("🔁 Convertir cuento actual a audio"):
+    if 'current_story' not in st.session_state:
         st.warning("Primero pulsa 'Obtener cuento aleatorio'.")
     else:
         try:
-            path, data = text_to_mp3_bytes(st.session_state['last_story'], lang='es')
+            # permitimos elegir idioma para la conversión (solo afecta al TTS)
+            lang_choice = st.selectbox("Idioma para el audio del cuento:", ("Español", "English"), key="lang_story_convert")
+            lg = 'es' if lang_choice == "Español" else 'en'
+            path, data = text_to_mp3_bytes(st.session_state['current_story'], lang=lg)
             st.success("Audio del cuento generado ✅")
             st.audio(data, format="audio/mp3")
             st.markdown(download_link_bytes(data, filename=os.path.basename(path), label="📥 Descargar audio del cuento"), unsafe_allow_html=True)
+            # una vez convertido, podemos eliminar la clave para evitar "último cuento"
+            del st.session_state['current_story']
         except Exception as e:
             st.error(f"Error al generar audio: {e}")
 
 st.markdown("---")
 
-# -------------------- Convertir texto propio --------------------
-st.markdown("## ✍️ Pega tu propio texto (en español)")
-user_text = st.text_area("Tu texto aquí (puedes pegar un cuento o cualquier texto en español)", height=220)
-lang_choice2 = st.selectbox("Idioma para el audio (texto propio):", ("Español", "English"), key="lang_text")
+# -------------------- AREA: PEGAR TEXTO PROPIO --------------------
+st.markdown("## ✍️ Pega tu propio texto (español)")
+user_text = st.text_area("Pega tu texto o cuento aquí:", height=220)
+lang_choice2 = st.selectbox("Idioma para el audio (tu texto):", ("Español", "English"), key="lang_text_convert")
 if st.button("🔊 Convertir texto a audio"):
     if not user_text.strip():
         st.warning("Por favor pega o escribe algún texto.")
     else:
-        lg2 = 'es' if lang_choice2 == "Español" else 'en'
         try:
+            lg2 = 'es' if lang_choice2 == "Español" else 'en'
             path2, data2 = text_to_mp3_bytes(user_text, lang=lg2)
             st.success("Audio generado ✅")
             st.audio(data2, format="audio/mp3")
@@ -277,7 +210,7 @@ if st.button("🔊 Convertir texto a audio"):
 
 st.markdown("---")
 
-# -------------------- LIMPIEZA TEMP --------------------
+# -------------------- LIMPIEZA AUTOMÁTICA --------------------
 def cleanup_temp(days=7):
     files = glob.glob("temp/*.mp3")
     now = time.time()
@@ -292,5 +225,4 @@ def cleanup_temp(days=7):
 cleanup_temp(7)
 
 # -------------------- FOOTER --------------------
-st.caption("Historias en español — limpias y directas. Si quieres más fuentes públicas en español, puedo añadirlas.")
-st.caption("gTTS usa conexión a internet para generar audio. Nada de la interfaz está en inglés, excepto la opción de idioma para convertir el texto si así lo deseas.")
+st.caption("Historias en español — limpias y directas. gTTS requiere conexión a internet para generar audio.")
