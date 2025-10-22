@@ -87,13 +87,13 @@ st.markdown("<div style='display:flex; gap:18px; align-items:center'>", unsafe_a
 if os.path.exists(hero_image_path):
     try:
         img = Image.open(hero_image_path)
-        st.image(img, use_column_width=True)
+        st.image(img, use_container_width=True)
     except Exception:
         # if failed to load local, try remote
         st.image(fallback_url, use_container_width=True)
 else:
     # load remote hero image
-    st.image(fallback_url, use_column_width=True)
+    st.image(fallback_url, =True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='text-align:center'>", unsafe_allow_html=True)
